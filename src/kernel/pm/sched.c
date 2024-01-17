@@ -24,6 +24,9 @@
 #include <nanvix/pm.h>
 #include <signal.h>
 
+const int FIFO = 0;
+const int ORDONNANCEMENT = FIFO;
+
 /**
  * @brief Schedules a process to execution.
  *
@@ -63,6 +66,18 @@ PUBLIC void resume(struct process *proc)
  * @brief Yields the processor.
  */
 PUBLIC void yield(void)
+{
+	switch(ORDONNANCEMENT) {
+		case FIFO:
+			fifo();
+			break;
+		default:
+			break;
+	}
+}
+
+
+PUBLIC void fifo(void)
 {
 	struct process *p;    /* Working process.     */
 	struct process *next; /* Next process to run. */
@@ -119,3 +134,4 @@ PUBLIC void yield(void)
 	if (curr_proc != next)
 		switch_to(next);
 }
+
