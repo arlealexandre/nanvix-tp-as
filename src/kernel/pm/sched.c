@@ -23,9 +23,14 @@
 #include <nanvix/hal.h>
 #include <nanvix/pm.h>
 #include <signal.h>
+#include <nanvix/klib.h>
 
-const int FIFO = 0;
-const int ORDONNANCEMENT = FIFO;
+#define FIFO 0
+#define LOTERIE 2
+
+int ran = 10;
+
+const int ORDONNANCEMENT = LOTERIE;
 
 /**
  * @brief Schedules a process to execution.
@@ -62,24 +67,71 @@ PUBLIC void resume(struct process *proc)
 		sched(proc);
 }
 
-/**
- * @brief Yields the processor.
- */
-PUBLIC void yield(void)
+PUBLIC void loterie(void)
 {
-	switch(ORDONNANCEMENT) {
-		case FIFO:
-			fifo();
-			break;
-		default:
-			break;
-	}
-}
+	struct process *p;	  /* Working process.     */
+	struct process *next; /* Next process to run. */
 
+	/* Re-schedule process for execution. */
+	if (curr_proc->state == PROC_RUNNING)
+		sched(curr_proc);
+
+	/* Remember this process. */
+	last_proc = curr_proc;
+
+	/* Check alarm. */
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip invalid processes. */
+		if (!IS_VALID(p))
+			continue;
+
+		/* Alarm has expired. */
+		if ((p->alarm) && (p->alarm < ticks))
+			p->alarm = 0, sndsig(p, SIGALRM);
+	}
+
+	/* Choose a process to run next. */
+	next = IDLE;
+
+	int total = 1;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+
+		if (p->state != PROC_READY)
+			continue;
+
+		next = p;
+
+		total += (41 - (20 + p->nice));
+	}
+	
+	int win = (krand() % total);
+	int range = 1;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+
+		if (p->state != PROC_READY)
+			continue;
+
+		range += (41 - (40 + p->nice));
+
+		if ((win <= range) && (win>=(range - (41 - (20 + p->nice))))) {
+			next = p;
+		}
+	}
+
+	/* Switch to next process. */
+	next->priority = PRIO_USER;
+	next->state = PROC_RUNNING;
+	next->counter = PROC_QUANTUM;
+	if (curr_proc != next)
+		switch_to(next);
+}
 
 PUBLIC void fifo(void)
 {
-	struct process *p;    /* Working process.     */
+	struct process *p;	  /* Working process.     */
 	struct process *next; /* Next process to run. */
 
 	/* Re-schedule process for execution. */
@@ -135,3 +187,20 @@ PUBLIC void fifo(void)
 		switch_to(next);
 }
 
+/**
+ * @brief Yields the processor.
+ */
+PUBLIC void yield(void)
+{
+	switch (ORDONNANCEMENT)
+	{
+	case FIFO:
+		fifo();
+		break;
+	case LOTERIE:
+		loterie();
+		break;
+	default:
+		break;
+	}
+}
