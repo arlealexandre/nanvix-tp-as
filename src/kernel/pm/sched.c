@@ -24,8 +24,9 @@
 #include <nanvix/pm.h>
 #include <signal.h>
 
-const int FIFO = 0;
-const int ORDONNANCEMENT = FIFO;
+#define FIFO 0
+#define PRIORITE 1
+const int ORDONNANCEMENT = PRIORITE;
 
 /**
  * @brief Schedules a process to execution.
@@ -62,22 +63,65 @@ PUBLIC void resume(struct process *proc)
 		sched(proc);
 }
 
-/**
- * @brief Yields the processor.
- */
-PUBLIC void yield(void)
-{
-	switch(ORDONNANCEMENT) {
-		case FIFO:
-			fifo();
-			break;
-		default:
-			break;
+PRIVATE void priorite() {
+	struct process *p;    /* Working process.     */
+	struct process *next; /* Next process to run. */
+
+	/* Re-schedule process for execution. */
+	if (curr_proc->state == PROC_RUNNING)
+		sched(curr_proc);
+
+	/* Remember this process. */
+	last_proc = curr_proc;
+
+	/* Check alarm. */
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip invalid processes. */
+		if (!IS_VALID(p))
+			continue;
+
+		/* Alarm has expired. */
+		if ((p->alarm) && (p->alarm < ticks))
+			p->alarm = 0, sndsig(p, SIGALRM);
 	}
+
+	next = IDLE;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++) {
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		/*
+		 * Process with higher
+		 * priority found.
+		 */
+		if (next!=IDLE) {
+			if (p->priority < next->priority) {
+				next = p;
+			} else if (p->priority == next->priority) {
+				if (p->nice < next->nice) {
+					next = p;
+				} else if (p->nice == next->nice) {
+					if (p->utime + p->ktime < next->utime + next->ktime) {
+						next = p;
+					}
+				}
+			}
+		} else {
+			next = p;
+		}
+	}
+
+	/* Switch to next process. */
+	next->priority = PRIO_USER;
+	next->state = PROC_RUNNING;
+	next->counter = PROC_QUANTUM;
+	if (curr_proc != next)
+		switch_to(next);
 }
 
-
-PUBLIC void fifo(void)
+PRIVATE void fifo(void)
 {
 	struct process *p;    /* Working process.     */
 	struct process *next; /* Next process to run. */
@@ -135,3 +179,20 @@ PUBLIC void fifo(void)
 		switch_to(next);
 }
 
+/**
+ * @brief Yields the processor.
+ */
+PUBLIC void yield(void)
+{
+	switch(ORDONNANCEMENT) {
+		case FIFO:
+			fifo();
+			break;
+		case PRIORITE:
+			priorite();
+			break;	
+		default:
+			fifo();
+			break;
+	}
+}
