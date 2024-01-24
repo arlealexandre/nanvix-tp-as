@@ -25,9 +25,10 @@
 #include <signal.h>
 #include <nanvix/klib.h>
 
-#define FIFO 0
+#define FIFO 0 // = ROUND ROBIN
 #define PRIORITE 1
 #define LOTERIE 2
+#define MULTIPLE_QUEUES 3
 
 const int ORDONNANCEMENT = LOTERIE;
 
@@ -93,7 +94,27 @@ PRIVATE void loterie(void)
 	/* Choose a process to run next. */
 	next = IDLE;
 
-	int total = 1;
+	int total = 0;
+
+	int min = INT_MAX;
+	int max = INT_MIN;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+
+		if (p->state != PROC_READY)
+			continue;
+
+		if (p->nice < min)
+		{
+			min = p->nice;
+		}
+
+		if (p->nice > max)
+		{
+			max = p->nice;
+		}
+	}
+
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
 	{
 
@@ -102,20 +123,20 @@ PRIVATE void loterie(void)
 
 		next = p;
 
-		total += (41 - (20 + p->nice));
+		total += ((max + 1) - (min + 1 + p->nice));
 	}
 
-	int win = (krand() % total);
-	int range = 1;
+	int win = total == 0 ? 0 : (krand() % total);
+	int range = 0;
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
 	{
-
 		if (p->state != PROC_READY)
 			continue;
 
-		range += (41 - (40 + p->nice));
+		int prevRange = range;
+		range += ((max + 1) - (min + 1 + p->nice));
 
-		if ((win <= range) && (win >= (range - (41 - (20 + p->nice)))))
+		if ((win <= range) && (win >= prevRange))
 		{
 			next = p;
 		}
@@ -199,6 +220,69 @@ PRIVATE void priorite()
 		switch_to(next);
 }
 
+PRIVATE void multiple_queues(void)
+{
+	struct process *p;	  /* Working process.     */
+	struct process *next; /* Next process to run. */
+
+	/* Re-schedule process for execution. */
+	if (curr_proc->state == PROC_RUNNING)
+		sched(curr_proc);
+
+	if (curr_proc->counter == 0)
+	{
+		curr_proc->class ++;
+	}
+
+	/* Remember this process. */
+	last_proc = curr_proc;
+
+	/* Check alarm. */
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip invalid processes. */
+		if (!IS_VALID(p))
+			continue;
+
+		/* Alarm has expired. */
+		if ((p->alarm) && (p->alarm < ticks))
+			p->alarm = 0, sndsig(p, SIGALRM);
+	}
+
+	/* Choose a process to run next. */
+	next = IDLE;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		/*
+		 * Process with higher
+		 * waiting time found.
+		 */
+		if (p->counter > next->counter)
+		{
+			next->counter++;
+			next = p;
+		}
+
+		/*
+		 * Increment waiting
+		 * time of process.
+		 */
+		else
+			p->counter++;
+	}
+
+	/* Switch to next process. */
+	next->priority = PRIO_USER;
+	next->state = PROC_RUNNING;
+	next->counter = (1 << (next->class - 1)) * PROC_QUANTUM;
+	if (curr_proc != next)
+		switch_to(next);
+}
+
 PRIVATE void fifo(void)
 {
 	struct process *p;	  /* Working process.     */
@@ -262,7 +346,6 @@ PRIVATE void fifo(void)
  */
 PUBLIC void yield(void)
 {
-
 	switch (ORDONNANCEMENT)
 	{
 	case FIFO:
@@ -273,6 +356,9 @@ PUBLIC void yield(void)
 		break;
 	case LOTERIE:
 		loterie();
+		break;
+	case MULTIPLE_QUEUES:
+		multiple_queues();
 		break;
 	default:
 		fifo();

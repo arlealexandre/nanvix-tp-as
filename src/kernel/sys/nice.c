@@ -22,6 +22,20 @@
 #include <errno.h>
 #include <limits.h>
 
+PUBLIC int nice2Class(int nice) {
+	if (nice < -20) {
+		return 1;
+	} else if (nice < 0) {
+		return 2;
+	} else if (nice < 20) {
+		return 3;
+	} else if (nice < 40) {
+		return 4;
+	} else {
+		return 5;
+	}
+}
+
 /*
  * Changes the nice value of the calling process.
  */
@@ -38,6 +52,8 @@ PUBLIC int sys_nice(int incr)
 		curr_proc->nice = 0;
 	else if (curr_proc->nice >= 2*NZERO)
 		curr_proc->nice = 2*NZERO - 1;
+
+	curr_proc->class = nice2Class(curr_proc->nice);
 
 	return (curr_proc->nice);
 }
