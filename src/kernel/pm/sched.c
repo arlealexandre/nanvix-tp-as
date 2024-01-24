@@ -26,9 +26,8 @@
 #include <nanvix/klib.h>
 
 #define FIFO 0
+#define PRIORITE 1
 #define LOTERIE 2
-
-int ran = 10;
 
 const int ORDONNANCEMENT = LOTERIE;
 
@@ -67,7 +66,7 @@ PUBLIC void resume(struct process *proc)
 		sched(proc);
 }
 
-PUBLIC void loterie(void)
+PRIVATE void loterie(void)
 {
 	struct process *p;	  /* Working process.     */
 	struct process *next; /* Next process to run. */
@@ -105,7 +104,7 @@ PUBLIC void loterie(void)
 
 		total += (41 - (20 + p->nice));
 	}
-	
+
 	int win = (krand() % total);
 	int range = 1;
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
@@ -116,7 +115,8 @@ PUBLIC void loterie(void)
 
 		range += (41 - (40 + p->nice));
 
-		if ((win <= range) && (win>=(range - (41 - (20 + p->nice))))) {
+		if ((win <= range) && (win >= (range - (41 - (20 + p->nice)))))
+		{
 			next = p;
 		}
 	}
@@ -129,7 +129,77 @@ PUBLIC void loterie(void)
 		switch_to(next);
 }
 
-PUBLIC void fifo(void)
+PRIVATE void priorite()
+{
+	struct process *p;	  /* Working process.     */
+	struct process *next; /* Next process to run. */
+
+	/* Re-schedule process for execution. */
+	if (curr_proc->state == PROC_RUNNING)
+		sched(curr_proc);
+
+	/* Remember this process. */
+	last_proc = curr_proc;
+
+	/* Check alarm. */
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip invalid processes. */
+		if (!IS_VALID(p))
+			continue;
+
+		/* Alarm has expired. */
+		if ((p->alarm) && (p->alarm < ticks))
+			p->alarm = 0, sndsig(p, SIGALRM);
+	}
+
+	next = IDLE;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		/*
+		 * Process with higher
+		 * priority found.
+		 */
+		if (next != IDLE)
+		{
+			if (p->priority < next->priority)
+			{
+				next = p;
+			}
+			else if (p->priority == next->priority)
+			{
+				if (p->nice < next->nice)
+				{
+					next = p;
+				}
+				else if (p->nice == next->nice)
+				{
+					if (p->utime + p->ktime < next->utime + next->ktime)
+					{
+						next = p;
+					}
+				}
+			}
+		}
+		else
+		{
+			next = p;
+		}
+	}
+
+	/* Switch to next process. */
+	next->priority = PRIO_USER;
+	next->state = PROC_RUNNING;
+	next->counter = PROC_QUANTUM;
+	if (curr_proc != next)
+		switch_to(next);
+}
+
+PRIVATE void fifo(void)
 {
 	struct process *p;	  /* Working process.     */
 	struct process *next; /* Next process to run. */
@@ -192,15 +262,20 @@ PUBLIC void fifo(void)
  */
 PUBLIC void yield(void)
 {
+
 	switch (ORDONNANCEMENT)
 	{
 	case FIFO:
 		fifo();
 		break;
+	case PRIORITE:
+		priorite();
+		break;
 	case LOTERIE:
 		loterie();
 		break;
 	default:
+		fifo();
 		break;
 	}
 }
