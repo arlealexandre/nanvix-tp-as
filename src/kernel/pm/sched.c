@@ -87,15 +87,11 @@ PRIVATE void loterie(struct process *p, struct process *next)
 {
 	int total = 0;
 
-	int min = INT_MAX;
 	int max = INT_MIN;
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
 	{
 		if (p->state != PROC_READY)
 			continue;
-
-		if (p->nice < min)
-			min = p->nice;
 
 		if (p->nice > max)
 			max = p->nice;
@@ -108,7 +104,7 @@ PRIVATE void loterie(struct process *p, struct process *next)
 
 		next = p;
 
-		total += -(min + 1 + p->nice);
+		total += max + 1 - p->nice;
 	}
 
 	int win = total == 0 ? 0 : (krand() % total);
@@ -119,7 +115,7 @@ PRIVATE void loterie(struct process *p, struct process *next)
 			continue;
 
 		int prevRange = range;
-		range += -(min + 1 + p->nice);
+		range += max + 1 - p->nice;
 
 		if ((win <= range) && (win >= prevRange))
 			next = p;
