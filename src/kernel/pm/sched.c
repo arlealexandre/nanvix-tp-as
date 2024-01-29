@@ -29,8 +29,9 @@
 #define PRIORITE 1
 #define LOTERIE 2
 #define MULTIPLE_QUEUES 3
+#define SHORTEST_JOB_FIRST 4
 
-const int ORDONNANCEMENT = LOTERIE;
+const int ORDONNANCEMENT = SHORTEST_JOB_FIRST;
 
 /**
  * @brief Schedules a process to execution.
@@ -182,6 +183,22 @@ PRIVATE void multiple_queues(struct process *p, struct process *next)
 	switchProcess(next);
 }
 
+PRIVATE void shortest_job_first(struct process *p, struct process *next)
+{
+
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		if (next == IDLE || p->averageTime <= next->averageTime)
+			next = p;
+	}
+
+	switchProcess(next);
+}
+
 PRIVATE void fifo(struct process *p, struct process *next)
 {
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
@@ -218,6 +235,10 @@ PUBLIC void yield(void)
 	struct process *p;	  /* Working process.     */
 	struct process *next; /* Next process to run. */
 
+	if (ORDONNANCEMENT == SHORTEST_JOB_FIRST) {
+		curr_proc->averageTime = (curr_proc->averageTime + (PROC_QUANTUM - curr_proc->counter)) / 2;
+	}
+
 	/* Re-schedule process for execution. */
 	if (curr_proc->state == PROC_RUNNING)
 		sched(curr_proc);
@@ -253,6 +274,9 @@ PUBLIC void yield(void)
 		break;
 	case MULTIPLE_QUEUES:
 		multiple_queues(p, next);
+		break;
+	case SHORTEST_JOB_FIRST:
+		shortest_job_first(p, next);
 	default:
 		break;
 	}
