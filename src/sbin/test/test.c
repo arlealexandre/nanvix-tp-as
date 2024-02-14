@@ -432,7 +432,7 @@ int semaphore_test3(void)
 	int mutex;                  /* Mutex.                   */
 	const int BUFFER_SIZE = 32; /* Buffer size.             */
 	const int NR_ITEMS = 512;   /* Number of items to send. */
-
+	
 	/* Create buffer.*/
 	buffer_fd = open("buffer", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (buffer_fd < 0)
@@ -448,16 +448,22 @@ int semaphore_test3(void)
 	SEM_INIT(empty, BUFFER_SIZE);
 	SEM_INIT(mutex, 1);
 
+	printf("avant fork, empty %d val empty = %d\n",empty, semctl(empty,0,0));
+
 	if ((pid = fork()) < 0)
 		return (-1);
 
 	/* Producer. */
 	else if (pid == 0)
 	{
+		printf("enter fils\n");
 		for (int item = 0; item < NR_ITEMS; item++)
-		{
+		{	
+			printf("avant sem empty fils\n");
 			SEM_DOWN(empty);
+			printf("enter sem empty fils\n");
 			SEM_DOWN(mutex);
+			printf("enter sem mutex fils\n");
 
 			PUT_ITEM(buffer_fd, item);
 
@@ -465,6 +471,7 @@ int semaphore_test3(void)
 			SEM_UP(full);
 		}
 
+		printf("exit fils\n");
 		_exit(EXIT_SUCCESS);
 	}
 
@@ -472,24 +479,28 @@ int semaphore_test3(void)
 	else
 	{
 		int item;
-
+		printf("enter pere\n");
 		do
 		{
+			printf("avant sem full pere\n");
 			SEM_DOWN(full);
+			printf("enter sem full pere\n");
 			SEM_DOWN(mutex);
+			printf("enter sem mutex pere\n");
 
 			GET_ITEM(buffer_fd, item);
 
 			SEM_UP(mutex);
 			SEM_UP(empty);
 		} while (item != (NR_ITEMS - 1));
+		printf("exit boucle\n");
 	}
 
 	/* Destroy semaphores. */
 	SEM_DESTROY(mutex);
 	SEM_DESTROY(empty);
 	SEM_DESTROY(full);
-
+	printf("exit destroy\n");
 	close(buffer_fd);
 	unlink("buffer");
 

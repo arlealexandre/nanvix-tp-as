@@ -12,7 +12,7 @@
 
 struct sem
 {
-    unsigned int key; // utiliser pour partager les processus
+    unsigned key; // utiliser pour partager les processus
     int counter; // compteur du sémaphore
     struct process * waiting_queue[WAIT_MAX]; // liste d'attente des processus
     int next_index_waiting;
@@ -25,5 +25,8 @@ struct sem_state {
 
 /* Tableau de sémaphores */
 EXTERN struct sem_state semtab[SEM_MAX];
+
+/* Fonction d'initialisation */
+EXTERN void sem_init(void);
 
 #endif /* NANVIX_SEM_H_ */

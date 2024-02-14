@@ -5,7 +5,7 @@
  * Permet à un processus d'utiliser un sémaphore associé à une clé (key).
  * Si aucun sémaphore n'est associé à key, un nouveau sémaphore doit être créé
 */
-PUBLIC int semget(int key) {
+PUBLIC int semget(unsigned key) {
 
     int empty_index = -1;
 
@@ -29,6 +29,7 @@ PUBLIC int semget(int key) {
         new_sem.next_index_waiting=0;
 
         semtab[empty_index].sem = &new_sem;
+        semtab[empty_index].state = FULL;
 
     }
 

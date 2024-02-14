@@ -264,6 +264,22 @@
 	 */
 	EXTERN int sys_gticks(void);
 
+	/*
+	 * Get or create semaphore of Key value key
+	 */
+	EXTERN int semget(unsigned key);
+
+	/*
+	 * GET/SET/FREE Semaphore semid
+	 */
+	EXTERN int semctl(int semid, int cmd, int val);
+
+	/*
+	 * Up/Down for Semaphore semid
+	 */
+
+	EXTERN int semop(int semid, int op);
+
 #endif /* _ASM_FILE_ */
 
 #endif /* NANVIX_SYSCALL_H_ */

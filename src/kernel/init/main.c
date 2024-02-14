@@ -25,6 +25,7 @@
 #include <nanvix/dev.h>
 #include <nanvix/pm.h>
 #include <nanvix/mm.h>
+#include <nanvix/sem.h>
 #include <nanvix/syscall.h>
 #include <fcntl.h>
 
