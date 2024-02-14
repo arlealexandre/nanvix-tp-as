@@ -1,6 +1,10 @@
 #include <nanvix/const.h>
 #include <nanvix/sem.h>
 
+/**
+ * Permet à un processus d'utiliser un sémaphore associé à une clé (key).
+ * Si aucun sémaphore n'est associé à key, un nouveau sémaphore doit être créé
+*/
 PUBLIC int semget(int key) {
 
     int empty_index = -1;
