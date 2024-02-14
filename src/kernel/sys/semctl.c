@@ -1,9 +1,9 @@
 #include <nanvix/const.h>
 #include <nanvix/sem.h>
 
-#define GETVAL 0
-#define SETVAL 1
-#define IPC_RMID 2
+#define GETVAL 12
+#define SETVAL 16
+#define IPC_RMID 0
 
 /**
  * Permet à une série d'opérations de contrôle sur le sémaphore identifié par semid.
@@ -24,7 +24,7 @@ PUBLIC int semctl(int semid, int cmd, int val)
         return semtab[semid].sem->counter;
         break;
     case SETVAL:
-        if (val < -WAIT_MAX || val > WAIT_MAX)
+        if (val < -WAIT_MAX || val > WAIT_MAX || semtab[semid].state==FREE)
         {
             return -1;
         }
