@@ -23,6 +23,15 @@
 #include <nanvix/hal.h>
 #include <nanvix/pm.h>
 #include <signal.h>
+#include <nanvix/klib.h>
+
+#define FIFO 0 // = ROUND ROBIN
+#define PRIORITE 1
+#define LOTERIE 2
+#define MULTIPLE_QUEUES 3
+#define SHORTEST_JOB_FIRST 4
+
+const int ORDONNANCEMENT = SHORTEST_JOB_FIRST;
 
 /**
  * @brief Schedules a process to execution.
@@ -60,34 +69,93 @@ PUBLIC void resume(struct process *proc)
 }
 
 /**
- * @brief Yields the processor.
+ * @brief comutation sur un nouveau processus
+ *
+ * @param proc Processus qui doit comuter.
+ *
+ * @note The process must stopped to be resumed.
  */
-PUBLIC void yield(void)
+PRIVATE void switchProcess(struct process *next)
 {
-	struct process *p;    /* Working process.     */
-	struct process *next; /* Next process to run. */
+	next->priority = PRIO_USER;
+	next->state = PROC_RUNNING;
+	next->counter = ORDONNANCEMENT == MULTIPLE_QUEUES ? (1 << (next->class - 1)) * PROC_QUANTUM : PROC_QUANTUM;
+	if (curr_proc != next)
+		switch_to(next);
+}
 
-	/* Re-schedule process for execution. */
-	if (curr_proc->state == PROC_RUNNING)
-		sched(curr_proc);
+PRIVATE void loterie(struct process *p, struct process *next)
+{
+	int total = 0;
 
-	/* Remember this process. */
-	last_proc = curr_proc;
-
-	/* Check alarm. */
+	int max = INT_MIN;
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
 	{
-		/* Skip invalid processes. */
-		if (!IS_VALID(p))
+		if (p->state != PROC_READY)
 			continue;
 
-		/* Alarm has expired. */
-		if ((p->alarm) && (p->alarm < ticks))
-			p->alarm = 0, sndsig(p, SIGALRM);
+		if (p->nice > max)
+			max = p->nice;
 	}
 
-	/* Choose a process to run next. */
-	next = IDLE;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		if (p->state != PROC_READY)
+			continue;
+
+		next = p;
+
+		total += max + 1 - p->nice;
+	}
+
+	int win = total == 0 ? 0 : (krand() % total);
+	int range = 0;
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		if (p->state != PROC_READY)
+			continue;
+
+		int prevRange = range;
+		range += max + 1 - p->nice;
+
+		if ((win <= range) && (win >= prevRange))
+			next = p;
+	}
+
+	switchProcess(next);
+}
+
+PRIVATE int isPriority(struct process *p1, struct process *p2)
+{
+	return (p1->priority < p2->priority) || (p1->priority == p2->priority && p1->nice < p2->nice)
+	|| (p1->priority == p2->priority && p1->nice == p2->nice && p1->utime + p1->ktime < p2->utime + p2->ktime);
+}
+
+PRIVATE void priorite(struct process *p, struct process *next)
+{
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		if (next == IDLE)
+			next = p;
+		/*
+		 * Process with higher
+		 * priority found.
+		 */
+		else if (isPriority(p, next))
+			next = p;
+	}
+	switchProcess(next);
+}
+
+PRIVATE void multiple_queues(struct process *p, struct process *next)
+{
+	if (curr_proc->counter == 0)
+		curr_proc->class ++;
+
 	for (p = FIRST_PROC; p <= LAST_PROC; p++)
 	{
 		/* Skip non-ready process. */
@@ -112,10 +180,104 @@ PUBLIC void yield(void)
 			p->counter++;
 	}
 
-	/* Switch to next process. */
-	next->priority = PRIO_USER;
-	next->state = PROC_RUNNING;
-	next->counter = PROC_QUANTUM;
-	if (curr_proc != next)
-		switch_to(next);
+	switchProcess(next);
+}
+
+PRIVATE void shortest_job_first(struct process *p, struct process *next)
+{
+
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		if (next == IDLE || p->averageTime <= next->averageTime)
+			next = p;
+	}
+
+	switchProcess(next);
+}
+
+PRIVATE void fifo(struct process *p, struct process *next)
+{
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip non-ready process. */
+		if (p->state != PROC_READY)
+			continue;
+
+		/*
+		 * Process with higher
+		 * waiting time found.
+		 */
+		if (p->counter > next->counter)
+		{
+			next->counter++;
+			next = p;
+		}
+
+		/*
+		 * Increment waiting
+		 * time of process.
+		 */
+		else
+			p->counter++;
+	}
+	switchProcess(next);
+}
+
+/**
+ * @brief Yields the processor.
+ */
+PUBLIC void yield(void)
+{
+	struct process *p;	  /* Working process.     */
+	struct process *next; /* Next process to run. */
+
+	if (ORDONNANCEMENT == SHORTEST_JOB_FIRST) {
+		curr_proc->averageTime = (curr_proc->averageTime + (PROC_QUANTUM - curr_proc->counter)) / 2;
+	}
+
+	/* Re-schedule process for execution. */
+	if (curr_proc->state == PROC_RUNNING)
+		sched(curr_proc);
+
+	/* Remember this process. */
+	last_proc = curr_proc;
+
+	/* Check alarm. */
+	for (p = FIRST_PROC; p <= LAST_PROC; p++)
+	{
+		/* Skip invalid processes. */
+		if (!IS_VALID(p))
+			continue;
+
+		next = p;
+
+		/* Alarm has expired. */
+		if ((p->alarm) && (p->alarm < ticks))
+			p->alarm = 0, sndsig(p, SIGALRM);
+	}
+
+	next = IDLE;
+	switch (ORDONNANCEMENT)
+	{
+	case FIFO:
+		fifo(p, next);
+		break;
+	case PRIORITE:
+		priorite(p, next);
+		break;
+	case LOTERIE:
+		loterie(p, next);
+		break;
+	case MULTIPLE_QUEUES:
+		multiple_queues(p, next);
+		break;
+	case SHORTEST_JOB_FIRST:
+		shortest_job_first(p, next);
+	default:
+		break;
+	}
 }

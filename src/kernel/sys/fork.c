@@ -26,6 +26,20 @@
 #include <sys/types.h>
 #include <errno.h>
 
+PUBLIC int niceToClass(int nice) {
+	if (nice < -20) {
+		return 1;
+	} else if (nice < 0) {
+		return 2;
+	} else if (nice < 20) {
+		return 3;
+	} else if (nice < 40) {
+		return 4;
+	} else {
+		return 5;
+	}
+}
+
 /*
  * Creates a new process.
  */
@@ -149,8 +163,10 @@ found:
 	proc->ktime = 0;
 	proc->cutime = 0;
 	proc->cktime = 0;
+	proc->averageTime = 0;
 	proc->priority = curr_proc->priority;
 	proc->nice = curr_proc->nice;
+	proc->class = niceToClass(proc->nice);
 	proc->alarm = 0;
 	proc->next = NULL;
 	proc->chain = NULL;

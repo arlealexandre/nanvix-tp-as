@@ -197,13 +197,15 @@
     	 * @name Scheduling information
     	 */
 		/**@{*/
-    	unsigned state;          /**< Current state.          */
-    	int counter;             /**< Remaining quantum.      */
-    	int priority;            /**< Process priorities.     */
-    	int nice;                /**< Nice for scheduling.    */
-    	unsigned alarm;          /**< Alarm.                  */
-		struct process *next;    /**< Next process in a list. */
-		struct process **chain;  /**< Sleeping chain.         */
+    	unsigned state;          /**< Current state.          											*/
+    	int counter;             /**< Remaining quantum.      											*/
+		int averageTime;		 /**< Represent the average time of execution on all previous execution	*/
+    	int priority;            /**< Process priorities.     											*/
+    	int nice;                /**< Nice for scheduling.    											*/
+		int class;				 /**< Class for multiple queues scheduling								*/
+    	unsigned alarm;          /**< Alarm.                  											*/
+		struct process *next;    /**< Next process in a list. 											*/
+		struct process **chain;  /**< Sleeping chain.         											*/
 		/**@}*/
 	};
 
