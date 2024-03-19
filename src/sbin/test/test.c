@@ -433,13 +433,8 @@ int semaphore_test3(void)
 	int full;					/* Full positions.          */
 	int mutex;					/* Mutex.                   */
 	const int BUFFER_SIZE = 32; /* Buffer size.             */
-<<<<<<< HEAD
 	const int NR_ITEMS = 512;	/* Number of items to send. */
 
-=======
-	const int NR_ITEMS = 512;   /* Number of items to send. */
-	
->>>>>>> main
 	/* Create buffer.*/
 	buffer_fd = open("buffer", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (buffer_fd < 0)
